@@ -7,6 +7,7 @@ import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ARQUIVO = os.path.join(ROOT, "config_local.json")
+IDIOMAS = ("pt", "en", "es", "auto")
 APPS = ("google", "meta", "tiktok")  # um app de desenvolvedor por empresa: google = YouTube; meta = Instagram + Facebook
 
 
@@ -17,6 +18,7 @@ def carregar():
             cfg = json.load(f)
     cfg.setdefault("broll_pasta", "")
     cfg.setdefault("pexels_chave", "")
+    cfg.setdefault("idioma", "pt")  # idioma falado nos vídeos; "auto" = o Whisper adivinha
     cfg.setdefault("contas", [])
     for app in APPS:
         cfg.setdefault("apps", {}).setdefault(app, {"id": "", "segredo": ""})
@@ -32,6 +34,7 @@ def salvar(cfg):
 def publico(cfg):
     """O que a tela vê: nada de chave, segredo ou token (só se já foram preenchidos)."""
     return {
+        "idioma": cfg["idioma"],
         "broll_pasta": cfg["broll_pasta"],
         "broll_pasta_ok": bool(cfg["broll_pasta"]) and os.path.isdir(cfg["broll_pasta"]),
         "pexels": bool(cfg["pexels_chave"]),
@@ -46,6 +49,8 @@ def atualizar(mudancas):
     cfg = carregar()
     if "broll_pasta" in mudancas:
         cfg["broll_pasta"] = str(mudancas["broll_pasta"]).strip().strip('"')
+    if mudancas.get("idioma") in IDIOMAS:
+        cfg["idioma"] = mudancas["idioma"]
     if mudancas.get("pexels_chave"):
         cfg["pexels_chave"] = str(mudancas["pexels_chave"]).strip()
     for app, v in (mudancas.get("apps") or {}).items():

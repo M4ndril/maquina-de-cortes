@@ -50,6 +50,15 @@ async function telaConfig() {
     h("p", { class: "fraco pequeno" }, "Chave gratuita em pexels.com/api (crie uma conta e copie a \"API key\"). Sem chave, o B-roll usa só a sua pasta."),
     h("div", { class: "linha" }, h("button", { class: "primario", onclick: () => salvar({ broll_pasta: pasta.value, pexels_chave: pexels.value }) }, "Salvar")));
 
+  // --- transcrição
+  const idioma = h("select", { onchange: () => salvar({ idioma: idioma.value }) },
+    [["pt", "Português"], ["en", "Inglês"], ["es", "Espanhol"], ["auto", "Detectar sozinho"]].map(([v, r]) => h("option", { value: v, selected: cfg.idioma === v }, r)));
+  const cartaoTranscricao = h("div", { class: "cartao" },
+    h("h2", {}, "Transcrição"),
+    h("div", { class: "linha" }, h("b", {}, "Idioma falado nos vídeos"), idioma),
+    h("p", { class: "fraco pequeno" }, "\"Detectar sozinho\" ouve só os primeiros 30 segundos: live que abre com vinheta ou música pode sair inteira no idioma errado. " +
+      "Para refazer uma live já transcrita: etapa 1 → Transcrever de novo."));
+
   // --- postagem: apps e contas
   const cartaoApp = (info) => {
     const app = cfg.apps[info.app];
@@ -79,6 +88,7 @@ async function telaConfig() {
   tela.replaceChildren(...[
     h("h1", {}, "Configurações"),
     aviso ? h("div", { class: "cartao" }, h("b", {}, aviso)) : null,
+    cartaoTranscricao,
     cartaoBroll,
     h("h2", {}, "Contas para postagem"),
     h("p", { class: "fraco pequeno" }, "O tema escrito em cada conta é o que o Claude usa para decidir em qual conta cada corte vai. " +

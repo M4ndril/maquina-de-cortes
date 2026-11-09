@@ -216,8 +216,9 @@ async def novo_por_upload(arquivo: UploadFile):
 
 
 @app.post("/api/projetos/{nome}/entrada")
-def refazer_entrada(nome: str):
-    return iniciar_tarefa("entrada", nome, [pasta_de(nome)])
+def refazer_entrada(nome: str, retranscrever: bool = Body(False, embed=True)):
+    """retranscrever: apaga a transcrição e faz de novo no idioma das Configurações (os tempos das frases mudam)."""
+    return iniciar_tarefa("entrada", nome, [pasta_de(nome)] + (["--retranscrever"] if retranscrever else []))
 
 
 @app.put("/api/projetos/{nome}/assuntos")

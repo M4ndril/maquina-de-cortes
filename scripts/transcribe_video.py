@@ -173,7 +173,9 @@ def parse_vtt(vtt_path):
         return None
     return segments
 
-def transcribe(input_file, model_name='large-v3', project_folder='tmp'):
+def transcribe(input_file, model_name='large-v3', project_folder='tmp', language=None):
+    # language: código do idioma falado ("pt", "en"...). None = o Whisper adivinha pelos primeiros 30 s, e erra quando
+    # a live abre com vinheta/música: aí a live inteira sai "traduzida" para o idioma errado.
     print(i18n(f"Iniciando transcrição de {input_file}..."))
     
     # Diagnóstico de Ambiente
@@ -268,7 +270,7 @@ def transcribe(input_file, model_name='large-v3', project_folder='tmp'):
             )
 
             # andamento no log ("Progress: x%"): transcrição vai de 0 a 50%, alinhamento de 50 a 100%
-            result = model.transcribe(audio, batch_size=16, chunk_size=10, print_progress=True, combined_progress=True)
+            result = model.transcribe(audio, batch_size=16, chunk_size=10, language=language, print_progress=True, combined_progress=True)
             
             detected_language = result["language"]
             start_segments = result["segments"]

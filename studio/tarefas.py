@@ -75,7 +75,7 @@ def salvar(pasta, proj):
 
 # ---------------------------------------------------------------- 1. entrada
 
-def entrada(pasta, url=None):
+def entrada(pasta, url=None, retranscrever=False):
     if url:
         progresso(2, "Baixando o vídeo...")
         from scripts import download_video
@@ -99,10 +99,16 @@ def entrada(pasta, url=None):
                         "-preset", "p1", "-b:v", "700k", "-g", "30", "-c:a", "aac", "-b:a", "64k",
                         "-movflags", "+faststart", proxy], check=True)
 
-    progresso(50, "Transcrevendo (pode levar alguns minutos)...")
+    import config
+    idioma = config.carregar()["idioma"]
+    if retranscrever:  # os três saem juntos: um input.srt sozinho seria lido como legenda pronta, só para alinhar
+        for ext in ("srt", "tsv", "json"):
+            if os.path.exists(os.path.join(pasta, f"input.{ext}")):
+                os.remove(os.path.join(pasta, f"input.{ext}"))
+    progresso(50, f"Transcrevendo em {idioma} (pode levar alguns minutos)...")
     from scripts import transcribe_video
     with BarraDoLog(r"Progress: ([\d.]+)%", lambda pct: progresso(50 + 0.48 * pct, f"Transcrevendo... {pct:.0f}%")):
-        transcribe_video.transcribe(video, "large-v3-turbo", project_folder=pasta)
+        transcribe_video.transcribe(video, "large-v3-turbo", project_folder=pasta, language=None if idioma == "auto" else idioma)
 
     proj = carregar(pasta)
     proj["etapa"] = max(proj.get("etapa", 1), 2)
@@ -491,6 +497,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("tarefa", choices=["entrada", "assuntos", "layouts", "broll", "exportar", "postar"])
     ap.add_argument("--privado", action="store_true")
+    ap.add_argument("--retranscrever", action="store_true")
     ap.add_argument("pasta")
     ap.add_argument("--url")
     ap.add_argument("--modelo", default="sonnet")
@@ -502,7 +509,7 @@ if __name__ == "__main__":
     a = ap.parse_args()
     pasta = None if a.pasta == "-" else os.path.abspath(a.pasta)
     if a.tarefa == "entrada":
-        entrada(pasta, a.url)
+        entrada(pasta, a.url, a.retranscrever)
     elif a.tarefa == "assuntos":
         assuntos(pasta, a.modelo, a.modo, a.min, a.max)
     elif a.tarefa == "layouts":

@@ -194,8 +194,14 @@ function etapaEntrada() {
     h("div", { class: "linha" },
       a.proxy && a.transcricao
         ? h("a", { href: `#/p/${enc(projeto.nome)}/2` }, h("button", { class: "primario" }, "Ir para os assuntos →"))
-        : h("button", { class: "primario", disabled: ocupado(), onclick: () => api("POST", `/api/projetos/${enc(projeto.nome)}/entrada`) },
-            ocupadoAqui() ? "Processando..." : "Processar entrada")));
+        : h("button", { class: "primario", disabled: ocupado(), onclick: () => api("POST", `/api/projetos/${enc(projeto.nome)}/entrada`, {}) },
+            ocupadoAqui() ? "Processando..." : "Processar entrada"),
+      a.transcricao ? h("button", { class: "discreto", disabled: ocupado(), title: "Para quando a transcrição saiu no idioma errado. O idioma é o das Configurações.",
+        onclick: () => {
+          if (projeto.assuntos.length && !confirm("Transcrever de novo muda o tempo das frases: os assuntos atuais deixam de bater com a fala e precisam ser gerados de novo. Continuar?")) return;
+          api("POST", `/api/projetos/${enc(projeto.nome)}/entrada`, { retranscrever: true });
+        } }, "Transcrever de novo") : null,
+      h("a", { href: "#/config", class: "fraco pequeno" }, "idioma da transcrição em Configurações")));
 }
 
 // ---------------------------------------------------------------- 2. assuntos
