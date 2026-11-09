@@ -15,3 +15,4 @@ __pycache__/
 *.pyc
 preview.jpg
 .claude/
+config_local.json

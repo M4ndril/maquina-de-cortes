@@ -16,7 +16,7 @@ button:disabled { opacity: .45; cursor: default; }
 button.primario { background: var(--acento); border-color: var(--acento); color: #fff; font-weight: 600; }
 button.discreto { background: none; border: none; color: var(--fraco); padding: 4px 6px; }
 button.perigo { color: var(--perigo); }
-input[type=text], input[type=number], select {
+input[type=text], input[type=number], input[type=password], .cartao > textarea, select {
   background: var(--bg); border: 1px solid var(--borda); border-radius: 8px; padding: 7px 10px;
 }
 input[type=text]:focus, input[type=number]:focus { outline: none; border-color: var(--acento); }
@@ -225,3 +225,13 @@ main:has(.layouts) { max-width: 1600px; }
 .trecho.escolhivel { outline: 2px dashed var(--acento); outline-offset: -3px; }
 .trecho.escolhivel:hover { background: #ff5a3640; }
 .trecho.tipo-pessoa { background: #ffb34722; }
+
+/* configurações, b-roll e postagem */
+.config-link { margin-left: auto; margin-right: 12px; font-size: 13px; opacity: .8; text-decoration: none; color: inherit; }
+.broll-item { display: flex; gap: 14px; padding: 12px 0; border-top: 1px solid #ffffff14; }
+.broll-thumb { width: 108px; height: 192px; flex: none; object-fit: cover; border-radius: 6px; background: #000; }
+.broll-thumb.vazio { display: flex; align-items: center; justify-content: center; font-size: 12px; opacity: .6; }
+.broll-corpo { flex: 1; min-width: 0; }
+.broll-corpo p { margin: 6px 0; }
+.cartao > textarea { resize: vertical; margin: 8px 0; box-sizing: border-box; font: inherit; }
+.conta-post { display: inline-flex; align-items: center; gap: 4px; margin-right: 14px; }

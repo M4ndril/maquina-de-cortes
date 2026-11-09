@@ -25,7 +25,8 @@ function etapaLayouts() {
           ocupado() && tarefa.tipo === "layouts" ? "Analisando..." : pendentes.length ? `Analisar layouts (${pendentes.length})` : "Layouts em dia"),
         h("span", { class: "fraco pequeno", style: "flex:1" },
           "Cada assunto é cortado e analisado: layout da live a cada instante e quem fala. Mudou início, fim ou resumo? Analise de novo: só o trecho novo é analisado e suas correções continuam onde a fala continua."),
-        h("a", { href: `#/p/${enc(projeto.nome)}/4` }, h("button", { class: "primario" }, "Exportar →")))),
+        h("a", { href: `#/p/${enc(projeto.nome)}/4` }, h("button", {}, "B-roll →")),
+        h("a", { href: `#/p/${enc(projeto.nome)}/5` }, h("button", { class: "primario" }, "Exportar →")))),
     h("div", { class: "layouts-grade" },
       h("div", { class: "cartao" }, lista),
       a?.layout ? editorLayout(a, () => analisar([a])) :

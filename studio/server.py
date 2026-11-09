@@ -14,7 +14,7 @@ import webbrowser
 
 import uvicorn
 from fastapi import Body, FastAPI, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -634,6 +634,161 @@ def exportar(nome: str, ids: list = Body(...), formatos: list = Body(...)):
     if not ids or not formatos:
         raise HTTPException(400, "Escolha pelo menos um assunto e um formato")
     return iniciar_tarefa("exportar", nome, [pasta_de(nome), "--ids", ",".join(ids), "--formatos", ",".join(formatos)])
+
+
+# ---------------------------------------------------------------- configurações (pasta/chave do b-roll, apps e contas)
+
+@app.get("/api/config")
+def ver_config():
+    import broll
+    import config
+    cfg = config.carregar()
+    return dict(config.publico(cfg), broll_arquivos=len(broll.arquivos(cfg["broll_pasta"])))
+
+
+@app.put("/api/config")
+def salvar_config(mudancas: dict = Body(...)):
+    import config
+    config.atualizar(mudancas)
+    return ver_config()
+
+
+@app.post("/api/config/escolher-pasta")
+def escolher_pasta():
+    """Janela do Windows para escolher a pasta de B-roll (app local). Processo separado: o tkinter quer a thread principal."""
+    r = subprocess.run([sys.executable, "-c", "import tkinter, tkinter.filedialog as f\nr = tkinter.Tk(); r.withdraw(); "
+                        "r.attributes('-topmost', 1)\nprint(f.askdirectory(title='Pasta de B-roll'))"],
+                       capture_output=True, text=True, encoding="utf-8", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    pasta = r.stdout.strip()
+    if r.returncode != 0:
+        raise HTTPException(500, "Não consegui abrir a janela de pastas; cole o caminho no campo.")
+    return {"pasta": os.path.normpath(pasta) if pasta else ""}
+
+
+@app.get("/api/contas/conectar/{app_nome}")
+def conectar_conta(app_nome: str):
+    """Leva o navegador para o login da plataforma; ela devolve para /api/contas/retorno."""
+    import config
+    import postagem
+    if app_nome not in config.APPS:
+        raise HTTPException(404, "Plataforma desconhecida")
+    try:
+        return RedirectResponse(postagem.url_login(app_nome))
+    except postagem.Erro as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/contas/retorno/{app_nome}")
+def retorno_conta(app_nome: str, code: str = "", state: str = "", error: str = "", error_description: str = ""):
+    import postagem
+    from urllib.parse import quote
+    try:
+        if not code:
+            raise postagem.Erro(error_description or error or "a plataforma não devolveu o código de acesso")
+        aviso = "Conectado: " + ", ".join(postagem.concluir_login(app_nome, code, state))
+    except (postagem.Erro, KeyError, OSError) as e:
+        aviso = f"Não consegui conectar: {e}"
+    return RedirectResponse(f"/#/config?aviso={quote(aviso)}")
+
+
+@app.delete("/api/contas/{cid}")
+def remover_conta(cid: str):
+    """Tira a conta do Studio (o acesso em si você revoga nas configurações da plataforma)."""
+    import config
+    cfg = config.carregar()
+    cfg["contas"] = [c for c in cfg["contas"] if c["id"] != cid]
+    config.salvar(cfg)
+    return ver_config()
+
+
+# ---------------------------------------------------------------- b-roll (etapa 4)
+
+@app.post("/api/projetos/{nome}/broll")
+def gerar_broll(nome: str, ids: list = Body(...), modelo: str = Body("sonnet")):
+    if not ids:
+        raise HTTPException(400, "Nenhum assunto escolhido")
+    return iniciar_tarefa("broll", nome, [pasta_de(nome), "--ids", ",".join(ids), "--modelo", modelo])
+
+
+@app.put("/api/projetos/{nome}/assuntos/{aid}/broll")
+def salvar_broll(nome: str, aid: str, itens: list = Body(..., embed=True)):
+    pasta = pasta_de(nome)
+    proj, a = _assunto(pasta, aid)
+    if not a.get("layout"):
+        raise HTTPException(409, "Analise os layouts deste assunto primeiro")
+    a["broll"] = {"assinatura": (a.get("broll") or a["layout"])["assinatura"], "itens": itens}
+    tarefas.salvar(pasta, proj)
+    return {"ok": True}
+
+
+@app.post("/api/broll/buscar")
+def buscar_broll(busca: str = Body(..., embed=True)):
+    """Opções de mídia para uma busca: arquivos da sua pasta com as palavras no nome, depois o Pexels."""
+    import broll
+    import config
+    cfg = config.carregar()
+    palavras = [p for p in busca.lower().split() if len(p) > 2]
+    locais = [broll.opcao_local(n) for n in broll.arquivos(cfg["broll_pasta"]) if palavras and any(p in n.lower() for p in palavras)]
+    return locais[:6] + broll.opcoes(busca, cfg)
+
+
+@app.get("/api/broll/arquivos")
+def arquivos_broll():
+    import broll
+    import config
+    return broll.arquivos(config.carregar()["broll_pasta"])
+
+
+@app.get("/api/broll/arquivo/{caminho:path}")
+def arquivo_broll(caminho: str):
+    import broll
+    import config
+    alvo = broll.caminho_na_pasta(config.carregar()["broll_pasta"], caminho)
+    if not alvo:
+        raise HTTPException(404, "Arquivo não encontrado na pasta de B-roll")
+    return FileResponse(alvo)
+
+
+# ---------------------------------------------------------------- postagem (etapa 6)
+
+@app.post("/api/projetos/{nome}/postagem/sugerir")
+def sugerir_postagem(nome: str, ids: list = Body(...), modelo: str = Body("sonnet")):
+    """O Claude escolhe as contas de cada corte e escreve título e descrição. Você confere antes de postar."""
+    import cortes
+    import postagem
+    pasta = pasta_de(nome)
+    proj = tarefas.carregar(pasta)
+    segs = cortes.carregar_transcricao(pasta)
+    alvos = [a for a in proj["assuntos"] if a["id"] in ids]
+    info = [{"id": a["id"], "titulo": a["titulo"],
+             "texto": " ".join(segs[i].get("text", "").strip() for i in (a.get("resumo") or {}).get("frases") or _frases_do_assunto(a, segs))}
+            for a in alvos]
+    try:
+        sugestoes = postagem.sugerir(info, modelo)
+    except (postagem.Erro, RuntimeError) as e:
+        raise HTTPException(502, f"Erro no Claude: {e}")
+    for a in alvos:
+        if a["id"] in sugestoes:
+            a["postagem"] = dict(sugestoes[a["id"]], feitas=(a.get("postagem") or {}).get("feitas", {}))
+    tarefas.salvar(pasta, proj)
+    return {a["id"]: a.get("postagem") for a in alvos}
+
+
+@app.put("/api/projetos/{nome}/assuntos/{aid}/postagem")
+def salvar_postagem(nome: str, aid: str, titulo: str = Body(""), descricao: str = Body(""), contas: list = Body(...)):
+    pasta = pasta_de(nome)
+    proj, a = _assunto(pasta, aid)
+    a["postagem"] = {"titulo": titulo.strip(), "descricao": descricao.strip(), "contas": contas,
+                     "feitas": (a.get("postagem") or {}).get("feitas", {})}
+    tarefas.salvar(pasta, proj)
+    return {"ok": True}
+
+
+@app.post("/api/projetos/{nome}/postar")
+def postar(nome: str, ids: list = Body(...), publico: bool = Body(True)):
+    if not ids:
+        raise HTTPException(400, "Nenhum corte escolhido")
+    return iniciar_tarefa("postar", nome, [pasta_de(nome), "--ids", ",".join(ids)] + ([] if publico else ["--privado"]))
 
 
 @app.post("/api/projetos/{nome}/abrir-pasta")

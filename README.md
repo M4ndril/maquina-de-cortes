@@ -1,11 +1,13 @@
 # Máquina de Cortes
 
-App local que transforma as lives do canal em cortes verticais (TikTok / Reels / Shorts), em 4 etapas:
+App local que transforma lives e vídeos longos em cortes verticais (TikTok / Reels / Shorts), em 6 etapas:
 
 1. **Entrada** — baixa a live (link) ou recebe o arquivo, gera uma cópia leve para o editor e transcreve (WhisperX).
 2. **Assuntos** — o Claude acha os assuntos completos; você ajusta na linha do tempo, resume e conversa com ele.
-3. **Layouts** — detecção automática do layout da live e de quem fala, com correção manual.
-4. **Exportar** — vídeo com legenda, sem legenda e pacote editável (XML do Premiere + .srt + mídia), com estilo e correção da legenda.
+3. **Layouts** — detecção automática do layout e de quem fala, com correção manual. Fora da geometria do canal (podcast, vlog, entrevista), o recorte vertical segue quem fala.
+4. **B-roll** (opcional) — o Claude propõe imagens/vídeos de apoio (Pexels ou a sua pasta); você confere e troca.
+5. **Exportar** — vídeo com legenda, sem legenda e pacote editável (XML do Premiere + .srt + mídia), com estilo e correção da legenda.
+6. **Postar** — o Claude escolhe em qual conta cada corte vai (pelo tema da conta) e escreve título e descrição; você confere e posta (YouTube, TikTok, Instagram, Facebook; várias contas por plataforma).
 
 ## Precisa ter
 
@@ -21,6 +23,7 @@ App local que transforma as lives do canal em cortes verticais (TikTok / Reels /
 
 - `studio/` — o app (servidor, tarefas, interface)
 - `scripts/` — download, transcrição, layout do canal, legenda, exportação para o Premiere
+- `config_local.json` — criado pela tela ⚙ Configurações: pasta e chave do B-roll, apps e contas de postagem (fora do git)
 - `layout_canal.json` — geometria e ajustes da detecção de layout
 - `legenda_canal.json` — estilo da legenda (editado na etapa 4)
 - `fontes/` — fontes extras (.ttf/.otf) para a legenda
