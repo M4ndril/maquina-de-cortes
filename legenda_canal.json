@@ -1,0 +1,18 @@
+{
+ "fonte": "Inter",
+ "tamanho": 30,
+ "tamanho_destaque": 35,
+ "cor": "#FFFFFF",
+ "cor_destaque": "#FC6F05",
+ "contorno": 0.0,
+ "cor_contorno": "#000000",
+ "sombra": 2.0,
+ "negrito": true,
+ "maiusculas": false,
+ "palavras": 5,
+ "modo": "colorir",
+ "sem_pontuacao": false,
+ "zoom": false,
+ "pausa": 1.5,
+ "margem": 40
+}

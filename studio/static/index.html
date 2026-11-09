@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Máquina de Cortes</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <a href="#/" class="marca">Máquina de Cortes</a>
+  <span id="trilha"></span>
+  <div id="tarefa" hidden>
+    <div class="barra"><div id="tarefa-progresso"></div></div>
+    <span id="tarefa-texto"></span>
+    <button id="tarefa-log-btn" class="discreto">log</button>
+    <button id="tarefa-parar" class="discreto perigo">parar</button>
+  </div>
+</header>
+
+<main id="tela"></main>
+
+<dialog id="log-dlg">
+  <pre id="log-txt"></pre>
+  <form method="dialog"><button>Fechar</button></form>
+</dialog>
+
+<dialog id="video-dlg">
+  <video id="video-dlg-player" controls></video>
+  <form method="dialog"><button>Fechar</button></form>
+</dialog>
+
+<script src="/static/editor.js"></script>
+<script src="/static/layouts.js"></script>
+<script src="/static/legenda.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

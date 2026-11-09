@@ -1,0 +1,9 @@
+numpy<2.1.0
+yt-dlp
+whisperx
+insightface
+opencv-python
+pillow
+fastapi
+uvicorn
+python-multipart
