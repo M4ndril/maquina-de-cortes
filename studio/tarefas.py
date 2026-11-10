@@ -308,8 +308,8 @@ def brolls(pasta, ids, modelo="sonnet", layout="layout_canal.json"):
     import config
     import cortes
     cfg = config.carregar()
-    if not cfg["pexels_chave"] and not broll.arquivos(cfg["broll_pasta"]):
-        raise SystemExit("Sem fonte de B-roll: em Configurações, informe a chave do Pexels e/ou uma pasta com suas mídias.")
+    if not cfg["pexels_chave"] and not cfg["pixabay_chave"] and not broll.arquivos(cfg["broll_pasta"]):
+        raise SystemExit("Sem fonte de B-roll: em Configurações, informe a chave do Pexels ou do Pixabay e/ou uma pasta com suas mídias.")
     cfg_layout = channel_layout.load_layout(layout)
     segmentos = cortes.carregar_transcricao(pasta)
     amostras = ler_amostras(pasta, cfg_layout)

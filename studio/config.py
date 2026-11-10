@@ -18,6 +18,7 @@ def carregar():
             cfg = json.load(f)
     cfg.setdefault("broll_pasta", "")
     cfg.setdefault("pexels_chave", "")
+    cfg.setdefault("pixabay_chave", "")
     cfg.setdefault("idioma", "pt")  # idioma falado nos vídeos; "auto" = o Whisper adivinha
     cfg.setdefault("contas", [])
     for app in APPS:
@@ -38,6 +39,7 @@ def publico(cfg):
         "broll_pasta": cfg["broll_pasta"],
         "broll_pasta_ok": bool(cfg["broll_pasta"]) and os.path.isdir(cfg["broll_pasta"]),
         "pexels": bool(cfg["pexels_chave"]),
+        "pixabay": bool(cfg["pixabay_chave"]),
         "apps": {k: {"id": v["id"], "segredo": bool(v["segredo"])} for k, v in cfg["apps"].items()},
         "contas": [{k: c.get(k, "") for k in ("id", "plataforma", "nome", "assuntos")} for c in cfg["contas"]],
     }
@@ -51,8 +53,9 @@ def atualizar(mudancas):
         cfg["broll_pasta"] = str(mudancas["broll_pasta"]).strip().strip('"')
     if mudancas.get("idioma") in IDIOMAS:
         cfg["idioma"] = mudancas["idioma"]
-    if mudancas.get("pexels_chave"):
-        cfg["pexels_chave"] = str(mudancas["pexels_chave"]).strip()
+    for banco in ("pexels", "pixabay"):
+        if mudancas.get(banco + "_chave"):
+            cfg[banco + "_chave"] = str(mudancas[banco + "_chave"]).strip()
     for app, v in (mudancas.get("apps") or {}).items():
         if app in APPS:
             cfg["apps"][app]["id"] = str(v.get("id", cfg["apps"][app]["id"])).strip()

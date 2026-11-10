@@ -2,7 +2,7 @@
 B-roll: imagens e vídeos de apoio por cima do corte já montado (antes da legenda, que fica por cima de tudo).
 
 O Claude lê as falas do corte e propõe os momentos ({inicio, fim, busca, posicao}); cada momento ganha opções de mídia
-(arquivo da sua pasta e/ou busca no Pexels) e você confere/troca na etapa de B-roll. Fica em assunto["broll"]:
+(arquivo da sua pasta e/ou busca no Pexels/Pixabay) e você confere/troca na etapa de B-roll. Fica em assunto["broll"]:
   {"assinatura": <a do layout para o qual foi feito>, "itens": [{id, inicio, fim, texto, busca, posicao, motivo,
                                                                   opcoes: [{tipo, origem, url | arquivo, thumb}], escolha}]}
 Tempos em segundos do corte. A mídia do Pexels só é baixada na exportação (VIRALS/<live>/broll/).
@@ -96,14 +96,38 @@ def buscar_pexels(busca, chave, n=6):
     return out
 
 
+def _pixabay(caminho, chave, **params):
+    req = urllib.request.Request(f"https://pixabay.com/api/{caminho}?{urllib.parse.urlencode(dict(params, key=chave))}",
+                                 headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        return json.load(r)
+
+
+def buscar_pixabay(busca, chave, n=6):
+    """Vídeos primeiro (o Pixabay não filtra vídeo por orientação: o recorte vertical é feito na montagem); fotos verticais completam."""
+    out = []
+    for v in _pixabay("videos/", chave, q=busca, per_page=max(n, 3)).get("hits", [])[:n]:
+        # ponytail: "medium" (~720p) basta para a metade da tela; "large" só se não houver
+        f = next((v["videos"][k] for k in ("medium", "large", "small") if v.get("videos", {}).get(k, {}).get("url")), None)
+        if f:
+            out.append({"tipo": "video", "origem": "pixabay", "url": f["url"], "pagina": v.get("pageURL", ""),
+                        "thumb": f"https://i.vimeocdn.com/video/{v['picture_id']}_295x166.jpg" if v.get("picture_id") else ""})
+    if len(out) < n:
+        for p in _pixabay("", chave, q=busca, image_type="photo", orientation="vertical", per_page=max(n - len(out), 3)).get("hits", [])[:n - len(out)]:
+            out.append({"tipo": "foto", "origem": "pixabay", "url": p["largeImageURL"], "thumb": p["webformatURL"], "pagina": p.get("pageURL", "")})
+    return out
+
+
 def opcoes(busca, cfg, arquivo=""):
-    """Opções de mídia para um momento: o arquivo que o Claude escolheu na pasta (se houver), depois a busca no Pexels."""
+    """Opções de mídia para um momento: o arquivo que o Claude escolheu na pasta (se houver), depois a busca nos bancos com chave."""
     out = [opcao_local(arquivo)] if arquivo and caminho_na_pasta(cfg["broll_pasta"], arquivo) else []
-    if cfg["pexels_chave"] and busca.strip():
-        try:
-            out += buscar_pexels(busca, cfg["pexels_chave"])
-        except OSError as e:
-            print(f"[B-roll] busca no Pexels falhou ({busca}): {e}")
+    bancos = [(nome, f, cfg[nome + "_chave"]) for nome, f in (("pexels", buscar_pexels), ("pixabay", buscar_pixabay)) if cfg.get(nome + "_chave")]
+    if busca.strip():
+        for nome, buscar, chave in bancos:
+            try:
+                out += buscar(busca, chave, 6 if len(bancos) == 1 else 4)
+            except OSError as e:
+                print(f"[B-roll] busca no {nome.capitalize()} falhou ({busca}): {e}")
     return out
 
 
@@ -145,7 +169,7 @@ def propor(segmentos, dur, cfg, modelo="sonnet"):
 # ---------------------------------------------------------------- montagem
 
 def midia(opcao, pasta_projeto, cfg):
-    """Arquivo local da opção escolhida (baixa do Pexels na primeira vez). None se não der para obter."""
+    """Arquivo local da opção escolhida (baixa do banco na primeira vez). None se não der para obter."""
     if opcao["origem"] == "pasta":
         return caminho_na_pasta(cfg["broll_pasta"], opcao["arquivo"])
     destino = os.path.join(pasta_projeto, "broll", hashlib.sha1(opcao["url"].encode()).hexdigest()[:16]

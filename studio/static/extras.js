@@ -39,6 +39,8 @@ async function telaConfig() {
   const pasta = h("input", { type: "text", value: cfg.broll_pasta, placeholder: "C:\\Users\\voce\\Videos\\B-roll", style: "flex:1" });
   const pexels = h("input", { type: "password", autocomplete: "off", style: "flex:1",
     placeholder: cfg.pexels ? "chave salva (preencha só para trocar)" : "cole aqui a chave da API do Pexels" });
+  const pixabay = h("input", { type: "password", autocomplete: "off", style: "flex:1",
+    placeholder: cfg.pixabay ? "chave salva (preencha só para trocar)" : "cole aqui a chave da API do Pixabay" });
   const cartaoBroll = h("div", { class: "cartao" },
     h("h2", {}, "B-roll"),
     h("div", { class: "linha" }, h("b", {}, "Minha pasta de mídias"), pasta,
@@ -47,8 +49,11 @@ async function telaConfig() {
     h("p", { class: "fraco pequeno" }, "Vídeos e imagens dessa pasta (e subpastas). O Claude escolhe pelo nome do arquivo: nomes descritivos ajudam (\"cavalo-montanha.mp4\")."),
     h("div", { class: "linha" }, h("b", {}, "Pexels (banco gratuito)"), pexels,
       h("span", { class: "selo" + (cfg.pexels ? " ok" : "") }, cfg.pexels ? "chave salva" : "sem chave")),
-    h("p", { class: "fraco pequeno" }, "Chave gratuita em pexels.com/api (crie uma conta e copie a \"API key\"). Sem chave, o B-roll usa só a sua pasta."),
-    h("div", { class: "linha" }, h("button", { class: "primario", onclick: () => salvar({ broll_pasta: pasta.value, pexels_chave: pexels.value }) }, "Salvar")));
+    h("p", { class: "fraco pequeno" }, "Chave gratuita em pexels.com/api (crie uma conta e copie a \"API key\"). O Pexels pode estar sem emitir chaves novas."),
+    h("div", { class: "linha" }, h("b", {}, "Pixabay (banco gratuito)"), pixabay,
+      h("span", { class: "selo" + (cfg.pixabay ? " ok" : "") }, cfg.pixabay ? "chave salva" : "sem chave")),
+    h("p", { class: "fraco pequeno" }, "Chave gratuita em pixabay.com/api/docs (crie uma conta e ela aparece na página). Sem nenhuma chave, o B-roll usa só a sua pasta."),
+    h("div", { class: "linha" }, h("button", { class: "primario", onclick: () => salvar({ broll_pasta: pasta.value, pexels_chave: pexels.value, pixabay_chave: pixabay.value }) }, "Salvar")));
 
   // --- transcrição
   const idioma = h("select", { onchange: () => salvar({ idioma: idioma.value }) },
@@ -121,7 +126,7 @@ function etapaBroll() {
         h("label", { class: "fraco pequeno" }, "modelo ", modelo),
         h("span", { class: "fraco pequeno", style: "flex:1" },
           "Opcional. O Claude lê cada corte e propõe onde entra imagem ou vídeo de apoio; você confere e troca aqui. A exportação aplica o que estiver nesta lista."),
-        h("a", { href: "#/config" }, h("button", { class: "discreto" }, "Pasta e Pexels")),
+        h("a", { href: "#/config" }, h("button", { class: "discreto" }, "Pasta e bancos de mídia")),
         h("a", { href: `#/p/${enc(projeto.nome)}/5` }, h("button", { class: "primario" }, "Exportar →")))),
     h("div", { class: "layouts-grade" },
       h("div", { class: "cartao" }, h("div", { class: "lista-assuntos" }, incluidos.map((x) =>
@@ -165,7 +170,7 @@ function editorBroll(a, gerar) {
     const buscar = async () => {
       it.busca = busca.value.trim();
       const novas = await api("POST", "/api/broll/buscar", { busca: it.busca });
-      if (!novas.length) return alert("Nada encontrado para essa busca (confira a chave do Pexels e a pasta em Configurações).");
+      if (!novas.length) return alert("Nada encontrado para essa busca (confira as chaves do Pexels/Pixabay e a pasta em Configurações).");
       it.opcoes = novas; it.escolha = 0; mudou();
     };
     busca.onkeydown = (e) => { if (e.key === "Enter") buscar(); };
@@ -194,9 +199,9 @@ function editorBroll(a, gerar) {
         h("div", { class: "linha" }, busca, h("button", { onclick: buscar }, "Buscar"), daPasta),
         h("div", { class: "linha pequeno" },
           it.opcoes.length > 1 ? h("button", { onclick: () => girar(-1) }, "◀") : null,
-          h("span", { class: "fraco" }, op ? `opção ${it.escolha + 1} de ${it.opcoes.length} · ${op.origem === "pasta" ? `sua pasta: ${op.arquivo}` : `Pexels (${op.tipo === "video" ? "vídeo" : "foto"})`}` : "busque ou escolha uma mídia"),
+          h("span", { class: "fraco" }, op ? `opção ${it.escolha + 1} de ${it.opcoes.length} · ${op.origem === "pasta" ? `sua pasta: ${op.arquivo}` : `${op.origem === "pixabay" ? "Pixabay" : "Pexels"} (${op.tipo === "video" ? "vídeo" : "foto"})`}` : "busque ou escolha uma mídia"),
           it.opcoes.length > 1 ? h("button", { onclick: () => girar(1) }, "Trocar ▶") : null,
-          op?.pagina ? h("a", { href: op.pagina, target: "_blank", rel: "noopener", class: "fraco" }, "abrir no Pexels") : null)));
+          op?.pagina ? h("a", { href: op.pagina, target: "_blank", rel: "noopener", class: "fraco" }, `abrir no ${op.origem === "pixabay" ? "Pixabay" : "Pexels"}`) : null)));
   };
 
   const desenhar = () => caixa.replaceChildren(
