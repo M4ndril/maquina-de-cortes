@@ -711,6 +711,11 @@ def gerar_broll(nome: str, ids: list = Body(...), modelo: str = Body("sonnet")):
     return iniciar_tarefa("broll", nome, [pasta_de(nome), "--ids", ",".join(ids), "--modelo", modelo])
 
 
+@app.post("/api/projetos/{nome}/assuntos/{aid}/broll/previa")
+def previa_broll(nome: str, aid: str):
+    return iniciar_tarefa("previa", nome, [pasta_de(nome), "--ids", aid])
+
+
 @app.put("/api/projetos/{nome}/assuntos/{aid}/broll")
 def salvar_broll(nome: str, aid: str, itens: list = Body(..., embed=True)):
     pasta = pasta_de(nome)

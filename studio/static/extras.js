@@ -158,6 +158,24 @@ function editorBroll(a, gerar) {
     $("#video-dlg").showModal();
     v.play();
   };
+  const previa = async (botao) => {  // monta o corte vertical com o b-roll (sem legenda) e abre quando ficar pronto
+    clearTimeout(salvarT);
+    await api("PUT", `/api/projetos/${enc(projeto.nome)}/assuntos/${a.id}/broll`, { itens });
+    await api("POST", `/api/projetos/${enc(projeto.nome)}/assuntos/${a.id}/broll/previa`);
+    botao.disabled = true;
+    let t;
+    do {
+      await new Promise((r) => setTimeout(r, 1000));
+      t = await api("GET", "/api/tarefa");
+      botao.textContent = `Montando prévia… ${Math.round(t.progresso || 0)}%`;
+    } while (t.status === "rodando");
+    botao.disabled = false; botao.textContent = "▶ Prévia com B-roll";
+    if (t.status === "erro") return alert("A prévia falhou: " + (t.texto || "veja o log"));
+    const v = $("#video-dlg-player");
+    v.src = `/media/${enc(projeto.nome)}/previa/${a.id}.mp4?v=${Date.now()}`;
+    $("#video-dlg").showModal();
+    v.play();
+  };
   let pastaArquivos = null;  // nomes da pasta do usuário, lidos na primeira vez que forem pedidos
 
   const cartaoItem = (it) => {
@@ -211,6 +229,7 @@ function editorBroll(a, gerar) {
         itens.push({ id: Math.random().toString(16).slice(2, 10), inicio: +livre.toFixed(1), fim: +(livre + 3).toFixed(1), busca: "", posicao: "cheia", motivo: "", texto: "", opcoes: [], escolha: 0 });
         mudou();
       }, disabled: !a.layout || a.layout_estado !== "ok", title: "Precisa do layout do assunto analisado (etapa 3)" }, "+ B-roll manual"),
+      itens.some((it) => it.opcoes[it.escolha]) ? h("button", { class: "primario", disabled: ocupado(), onclick: (e) => previa(e.currentTarget) }, "▶ Prévia com B-roll") : null,
       h("button", { class: "discreto", disabled: ocupado(), onclick: () => { if (!itens.length || confirm("Trocar a lista atual por uma nova sugestão do Claude?")) gerar(); } },
         itens.length ? "Sugerir de novo" : "Sugerir com o Claude")),
     itens.length ? h("div", {}, itens.map(cartaoItem))

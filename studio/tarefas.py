@@ -334,6 +334,31 @@ def brolls(pasta, ids, modelo="sonnet", layout="layout_canal.json"):
 
 # ---------------------------------------------------------------- 5. exportação
 
+def previa_broll(pasta, aid, layout="layout_canal.json"):
+    """Monta o corte vertical com o b-roll da lista (sem legenda) em previa/<id>.mp4, para conferir antes de exportar."""
+    from scripts import channel_layout
+    import broll
+    import config
+    import cortes
+    a = next((x for x in carregar(pasta)["assuntos"] if x["id"] == aid), None)
+    lay, video = layout_valido(pasta, a, cortes.carregar_transcricao(pasta)) if a else (None, None)
+    if not lay or not broll_valido(a):
+        raise SystemExit("Prévia: o corte mudou depois do layout ou do b-roll; refaça as etapas 3 e 4 deste assunto.")
+    dest = os.path.join(pasta, "previa")
+    os.makedirs(dest, exist_ok=True)
+    corte, final = os.path.join(dest, f"{aid}_original_scale.mp4"), os.path.join(dest, f"{aid}.mp4")
+    progresso(10, "Montando o corte...")
+    _link(video, corte)
+    ok = channel_layout.montar(corte, dest, channel_layout.load_layout(layout), lay["plans"])
+    os.remove(corte)
+    if not ok:
+        raise SystemExit("Prévia: não consegui montar o corte (veja o log).")
+    progresso(60, "Colocando o b-roll...")
+    itens = a["broll"]["itens"]
+    feitos = broll.aplicar(final, itens, pasta, config.carregar(), channel_layout.info_video(final)[0])
+    progresso(100, f"Prévia pronta: {feitos} de {len(itens)} b-roll(s)")
+
+
 def _link(src, dst):
     if os.path.exists(dst):
         os.remove(dst)
@@ -495,7 +520,7 @@ def postar(pasta, ids, publico=True):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("tarefa", choices=["entrada", "assuntos", "layouts", "broll", "exportar", "postar"])
+    ap.add_argument("tarefa", choices=["entrada", "assuntos", "layouts", "broll", "previa", "exportar", "postar"])
     ap.add_argument("--privado", action="store_true")
     ap.add_argument("--retranscrever", action="store_true")
     ap.add_argument("pasta")
@@ -514,6 +539,8 @@ if __name__ == "__main__":
         assuntos(pasta, a.modelo, a.modo, a.min, a.max)
     elif a.tarefa == "layouts":
         layouts(pasta, [i for i in a.ids.split(",") if i])
+    elif a.tarefa == "previa":
+        previa_broll(pasta, a.ids)
     elif a.tarefa == "broll":
         brolls(pasta, [i for i in a.ids.split(",") if i], a.modelo)
     elif a.tarefa == "postar":
