@@ -107,11 +107,12 @@ def buscar_pixabay(busca, chave, n=6):
     """Vídeos primeiro (o Pixabay não filtra vídeo por orientação: o recorte vertical é feito na montagem); fotos verticais completam."""
     out = []
     for v in _pixabay("videos/", chave, q=busca, per_page=max(n, 3)).get("hits", [])[:n]:
-        # ponytail: "medium" (~720p) basta para a metade da tela; "large" só se não houver
-        f = next((v["videos"][k] for k in ("medium", "large", "small") if v.get("videos", {}).get(k, {}).get("url")), None)
-        if f:
-            out.append({"tipo": "video", "origem": "pixabay", "url": f["url"], "pagina": v.get("pageURL", ""),
-                        "thumb": f"https://i.vimeocdn.com/video/{v['picture_id']}_295x166.jpg" if v.get("picture_id") else ""})
+        # o menor arquivo com pelo menos 720 de largura (os tamanhos large/medium/small variam por vídeo); senão o maior
+        fs = [f for f in v.get("videos", {}).values() if f.get("url") and f.get("width")]
+        if fs:
+            bons = [f for f in fs if f["width"] >= 720]
+            f = min(bons, key=lambda f: f["width"]) if bons else max(fs, key=lambda f: f["width"])
+            out.append({"tipo": "video", "origem": "pixabay", "url": f["url"], "pagina": v.get("pageURL", ""), "thumb": f.get("thumbnail", "")})
     if len(out) < n:
         for p in _pixabay("", chave, q=busca, image_type="photo", orientation="vertical", per_page=max(n - len(out), 3)).get("hits", [])[:n - len(out)]:
             out.append({"tipo": "foto", "origem": "pixabay", "url": p["largeImageURL"], "thumb": p["webformatURL"], "pagina": p.get("pageURL", "")})
