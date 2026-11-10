@@ -106,7 +106,9 @@ def _pixabay(caminho, chave, **params):
 def buscar_pixabay(busca, chave, n=6):
     """Vídeos primeiro (o Pixabay não filtra vídeo por orientação: o recorte vertical é feito na montagem); fotos verticais completam."""
     out = []
-    for v in _pixabay("videos/", chave, q=busca, per_page=max(n, 3)).get("hits", [])[:n]:
+    hits = _pixabay("videos/", chave, q=busca, per_page=50).get("hits", [])
+    em_pe = lambda v: any(f.get("height", 0) > f.get("width", 0) for f in v.get("videos", {}).values())
+    for v in sorted(hits, key=lambda v: not em_pe(v))[:n]:  # verticais primeiro: enchem a tela sem zoom
         # o menor arquivo com pelo menos 720 de largura (os tamanhos large/medium/small variam por vídeo); senão o maior
         fs = [f for f in v.get("videos", {}).values() if f.get("url") and f.get("width")]
         if fs:
@@ -194,11 +196,29 @@ def filtro(itens, fps):
     partes, atual = [], "0:v"
     for k, it in enumerate(itens, 1):
         x, y, w, h = POSICOES[it["posicao"]]
-        partes.append(f"[{k}:v]scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},setsar=1,fps={fps:.3f},"
+        encher = f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h}"
+        if it.get("encaixar"):  # mídia bem mais larga que o espaço: inteira no meio, com ela mesma desfocada no fundo
+            encher = (f"split[e{k}][f{k}];[e{k}]{encher},boxblur=24:4,eq=brightness=-0.12[g{k}];"
+                      f"[f{k}]scale={w}:{h}:force_original_aspect_ratio=decrease[h{k}];[g{k}][h{k}]overlay=(W-w)/2:(H-h)/2")
+        partes.append(f"[{k}:v]{encher},setsar=1,fps={fps:.3f},"
                       f"format=yuv420p,setpts=PTS-STARTPTS+{it['inicio']:.3f}/TB[b{k}];"
                       f"[{atual}][b{k}]overlay={x}:{y}:enable='between(t,{it['inicio']:.3f},{it['fim']:.3f})':eof_action=pass[v{k}]")
         atual = f"v{k}"
     return ";".join(partes), atual
+
+
+MAX_CORTE = 0.5  # encher o espaço pode cortar até metade da largura da mídia; mais que isso vira zoom demais
+
+
+def _proporcao(arq):
+    """largura/altura da mídia (0 se o ffprobe não souber: aí enche o espaço, como antes)."""
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
+                        "-of", "csv=p=0", arq], capture_output=True, text=True)
+    try:
+        w, h = map(int, r.stdout.strip().split(",")[:2])
+        return w / h
+    except ValueError:
+        return 0
 
 
 def aplicar(video, itens, pasta_projeto, cfg, fps):
@@ -208,6 +228,8 @@ def aplicar(video, itens, pasta_projeto, cfg, fps):
         op = it["opcoes"][it["escolha"]] if 0 <= it.get("escolha", 0) < len(it.get("opcoes") or []) else None
         arq = op and midia(op, pasta_projeto, cfg)
         if arq:
+            _, _, w, h = POSICOES[it["posicao"]]
+            it = dict(it, encaixar=_proporcao(arq) * MAX_CORTE > w / h)
             prontos.append((it, op, arq))
         else:
             print(f"[B-roll] sem mídia para o momento {it['inicio']:.1f}s ({it['busca']}): fica sem b-roll")
@@ -238,6 +260,7 @@ def selftest():
     assert texto_em(segs, 1.2, 2.5) == "dois três"
     assert opcao_local("Praia/Mar.MOV") == {"tipo": "video", "origem": "pasta", "arquivo": "Praia/Mar.MOV"} and opcao_local("a.png")["tipo"] == "foto"
     g, final = filtro([{"inicio": 2.0, "fim": 5.0, "posicao": "cima"}, {"inicio": 9.0, "fim": 12.0, "posicao": "cheia"}], 30)
+    assert "boxblur" in filtro([{"inicio": 1.0, "fim": 2.0, "posicao": "cheia", "encaixar": True}], 30)[0] and "boxblur" not in g
     assert final == "v2" and "[0:v][b1]overlay=0:0:enable='between(t,2.000,5.000)'" in g and "[v1][b2]overlay=0:0" in g and "scale=1080:960" in g, g
     import tempfile
     with tempfile.TemporaryDirectory() as d:
