@@ -1,7 +1,7 @@
 // Máquina de Cortes — interface em etapas. Estado no servidor (projeto.json); aqui só a tela.
 const $ = (sel, el = document) => el.querySelector(sel);
 const tela = $("#tela");
-const ETAPAS = ["Entrada", "Assuntos", "Layouts", "B-roll", "Exportar", "Postar"];
+const ETAPAS = ["Entrada", "Assuntos", "Layouts", "Exportar", "Postar"];
 let tarefa = { status: "livre" };
 let projeto = null;      // projeto aberto
 let salvarTimer = null;
@@ -89,7 +89,7 @@ async function rotear() {
   projeto = await api("GET", `/api/projetos/${m[1]}`);
   $("#trilha").textContent = projeto.nome;
   const n = +m[2];
-  tela.replaceChildren(abas(n), [null, etapaEntrada, etapaAssuntos, etapaLayouts, etapaBroll, etapaExportar, etapaPostar][n]());
+  tela.replaceChildren(abas(n), [null, etapaEntrada, etapaAssuntos, etapaLayouts, etapaExportar, etapaPostar][n]());
 }
 window.addEventListener("hashchange", rotear);
 
@@ -126,7 +126,7 @@ async function inicio() {
         h("button", { disabled: ocupado(), onclick: () => arquivo.click() }, "Enviar arquivo de vídeo"), arquivo),
       h("p", { class: "fraco pequeno" }, "Depois do download o sistema gera uma cópia leve para o editor e transcreve a live sozinho.")),
     h("div", { class: "projetos" }, lista.length ? lista.map((p) =>
-      h("a", { class: "projeto", href: `#/p/${enc(p.nome)}/${Math.min(p.etapa || 1, 6)}` },
+      h("a", { class: "projeto", href: `#/p/${enc(p.nome)}/${Math.min(p.etapa || 1, 5)}` },
         h("span", { class: "nome" }, p.nome),
         h("span", { class: "fraco pequeno" }, new Date(p.data * 1000).toLocaleDateString("pt-BR")),
         p.assuntos ? h("span", { class: "selo" }, `${p.assuntos} assuntos`) : null,
@@ -280,7 +280,7 @@ function etapaExportar() {
     res.length ? h("div", { class: "cartao" },
       h("div", { class: "linha" }, h("h2", { style: "flex:1;margin:0" }, "Última exportação"),
         h("button", { onclick: () => api("POST", `/api/projetos/${enc(projeto.nome)}/abrir-pasta`, { sub: "entrega" }) }, "Abrir pasta"),
-        h("a", { href: `#/p/${enc(projeto.nome)}/6` }, h("button", { class: "primario" }, "Postar →"))),
+        h("a", { href: `#/p/${enc(projeto.nome)}/5` }, h("button", { class: "primario" }, "Postar →"))),
       res.map((c) => h("div", { class: "resultado" },
         h("span", { class: "nome" }, nomes[c.id] || c.pasta),
         c.erro ? h("span", { class: "selo", style: "color:var(--perigo)" }, "falhou") :

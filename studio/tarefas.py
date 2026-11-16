@@ -4,7 +4,6 @@ Cada linha "@@progresso <0-100> <texto>" atualiza a barra de progresso; "@@proje
 
   python studio/tarefas.py entrada  <pasta|-> [--url URL]
   python studio/tarefas.py assuntos <pasta> [--modelo sonnet] [--modo novo|mais] [--min 30] [--max 90]
-  python studio/tarefas.py broll    <pasta> --ids id1,id2 [--modelo sonnet]
   python studio/tarefas.py exportar <pasta> --ids id1,id2 --formatos legenda,sem_legenda,editavel
   python studio/tarefas.py postar   <pasta> --ids id1,id2 [--privado]
 """
@@ -118,7 +117,7 @@ def entrada(pasta, url=None, retranscrever=False):
 
 # ---------------------------------------------------------------- 2. assuntos
 
-PROMPT_ASSUNTOS = """Você é o editor de cortes de um canal de notícias e debate político ao vivo. Encontre, na transcrição da live abaixo, os ASSUNTOS COMPLETOS que funcionam sozinhos como vídeo curto (TikTok / Instagram Reels / YouTube Shorts).
+PROMPT_ASSUNTOS = """Você é o editor de cortes de um canal de lives e vídeos longos (podcast, entrevista, debate, notícias, aula). Encontre, na transcrição da live abaixo, os ASSUNTOS COMPLETOS que funcionam sozinhos como vídeo curto (TikTok / Instagram Reels / YouTube Shorts).
 
 Cada linha da transcrição é uma fala com seu tempo exato em segundos: `[início-fim] texto`.
 
@@ -292,72 +291,7 @@ def layouts(pasta, ids, layout="layout_canal.json"):
     progresso(100, f"Layouts analisados: {len(alvos)} assunto(s)")
 
 
-# ---------------------------------------------------------------- 4. b-roll
-
-def broll_valido(a):
-    """B-roll do assunto, se foi feito para o corte atual (mesma assinatura do layout); senão None."""
-    b, lay = a.get("broll"), a.get("layout")
-    return b if b and lay and b.get("assinatura") == lay.get("assinatura") else None
-
-
-def brolls(pasta, ids, modelo="sonnet", layout="layout_canal.json"):
-    """O Claude propõe os b-rolls de cada assunto (momentos + busca) e as opções de mídia são buscadas.
-    Nada é renderizado aqui: você confere na etapa 4 e a exportação aplica."""
-    from scripts import channel_layout
-    import broll
-    import config
-    import cortes
-    cfg = config.carregar()
-    if not cfg["pexels_chave"] and not cfg["pixabay_chave"] and not broll.arquivos(cfg["broll_pasta"]):
-        raise SystemExit("Sem fonte de B-roll: em Configurações, informe a chave do Pexels ou do Pixabay e/ou uma pasta com suas mídias.")
-    cfg_layout = channel_layout.load_layout(layout)
-    segmentos = cortes.carregar_transcricao(pasta)
-    amostras = ler_amostras(pasta, cfg_layout)
-    alvos = [a for a in carregar(pasta)["assuntos"] if a["id"] in ids]
-    total = 0
-    for n, a in enumerate(alvos):
-        progresso(100 * n / len(alvos), f"B-roll {n + 1}/{len(alvos)}: {a['titulo']}")
-        lay, _ = layout_valido(pasta, a, segmentos)
-        if not lay:  # os tempos do b-roll são os do corte: precisa do corte (etapa 3) em dia
-            lay, _ = analisar_layout(pasta, a, segmentos, cfg_layout, amostras)
-        legenda = cortes.legenda_dos_trechos(segmentos, lay["trechos_video"])["segments"]
-        itens = broll.propor(legenda, sum(e - s for s, e in lay["trechos_video"]), cfg, modelo)
-        print(f"[B-roll] {a['titulo']}: {len(itens)} momento(s), {sum(1 for i in itens if not i['opcoes'])} sem mídia")
-        total += len(itens)
-        proj = carregar(pasta)
-        for b in proj["assuntos"]:
-            if b["id"] == a["id"]:
-                b["broll"] = {"assinatura": lay["assinatura"], "itens": itens}
-        salvar(pasta, proj)
-    progresso(100, f"{total} b-roll(s) propostos em {len(alvos)} assunto(s): confira antes de exportar")
-
-
-# ---------------------------------------------------------------- 5. exportação
-
-def previa_broll(pasta, aid, layout="layout_canal.json"):
-    """Monta o corte vertical com o b-roll da lista (sem legenda) em previa/<id>.mp4, para conferir antes de exportar."""
-    from scripts import channel_layout
-    import broll
-    import config
-    import cortes
-    a = next((x for x in carregar(pasta)["assuntos"] if x["id"] == aid), None)
-    lay, video = layout_valido(pasta, a, cortes.carregar_transcricao(pasta)) if a else (None, None)
-    if not lay or not broll_valido(a):
-        raise SystemExit("Prévia: o corte mudou depois do layout ou do b-roll; refaça as etapas 3 e 4 deste assunto.")
-    dest = os.path.join(pasta, "previa")
-    os.makedirs(dest, exist_ok=True)
-    corte, final = os.path.join(dest, f"{aid}_original_scale.mp4"), os.path.join(dest, f"{aid}.mp4")
-    progresso(10, "Montando o corte...")
-    _link(video, corte)
-    ok = channel_layout.montar(corte, dest, channel_layout.load_layout(layout), lay["plans"])
-    os.remove(corte)
-    if not ok:
-        raise SystemExit("Prévia: não consegui montar o corte (veja o log).")
-    progresso(60, "Colocando o b-roll...")
-    itens = a["broll"]["itens"]
-    feitos = broll.aplicar(final, itens, pasta, config.carregar(), channel_layout.info_video(final)[0])
-    progresso(100, f"Prévia pronta: {feitos} de {len(itens)} b-roll(s)")
-
+# ---------------------------------------------------------------- 4. exportação
 
 def _link(src, dst):
     if os.path.exists(dst):
@@ -411,23 +345,6 @@ def exportar(pasta, ids, formatos, layout="layout_canal.json"):
     em_paralelo("Montando", 20, 62, lambda a, base, lay, n: channel_layout.montar(
         os.path.join(pasta, "cuts", f"{base}_original_scale.mp4"), os.path.join(pasta, "final"), cfg, lay["plans"]), prontos)
 
-    def por_broll(a, base, lay, n):  # por cima da montagem e por baixo da legenda; falha = corte sai sem b-roll
-        import broll
-        import config
-        final = os.path.join(pasta, "final", f"{base}.mp4")
-        itens = (broll_valido(a) or {}).get("itens")
-        if a.get("broll") and itens is None:
-            print(f"[B-roll] {a['titulo']}: o corte mudou depois do b-roll; exportado sem b-roll (gere de novo na etapa 4)")
-        if not itens or not os.path.exists(final):
-            return
-        try:
-            feitos = broll.aplicar(final, itens, pasta, config.carregar(), channel_layout.info_video(final)[0])
-            print(f"[B-roll] {base}: {feitos} de {len(itens)} aplicado(s)")
-        except subprocess.CalledProcessError as e:
-            print(f"[B-roll] ERRO em {base}, exportado sem b-roll: {e}")
-    if any(a.get("broll") for a, *_ in prontos):
-        em_paralelo("B-roll", 62, 70, por_broll, prontos)
-
     sub_cfg = legenda.config_ass(legenda.carregar())  # estilo do canal, ajustado na etapa 4
     if "legenda" in formatos:
         progresso(70, "Gravando legendas...")
@@ -468,7 +385,7 @@ def exportar(pasta, ids, formatos, layout="layout_canal.json"):
     feitos = {r["id"] for r in resultado}
     antigos = [c for c in (proj.get("exportacao") or {}).get("cortes", []) if c["id"] in ordem and c["id"] not in feitos]
     proj["exportacao"] = {"formatos": formatos, "cortes": sorted(antigos + resultado, key=lambda c: ordem.index(c["id"]))}
-    proj["etapa"] = 5
+    proj["etapa"] = 4
     salvar(pasta, proj)
     progresso(100, f"{len(resultado)} corte(s) exportado(s) em entrega/")
 
@@ -502,7 +419,7 @@ def postar(pasta, ids, publico=True):
         video = video_da_entrega(pasta, proj, a["id"])
         try:
             if not video:
-                raise postagem.Erro("este corte ainda não foi exportado (etapa 5)")
+                raise postagem.Erro("este corte ainda não foi exportado (etapa 4)")
             p = a["postagem"]
             feita = {"ok": True, "link": postagem.postar(conta, video, p.get("titulo") or a["titulo"], p.get("descricao", ""), publico)}
             ok += 1
@@ -513,14 +430,14 @@ def postar(pasta, ids, publico=True):
         for b in atual["assuntos"]:
             if b["id"] == a["id"] and b.get("postagem"):
                 b["postagem"].setdefault("feitas", {})[conta["id"]] = dict(feita, data=time.strftime("%d/%m %H:%M"))
-        atual["etapa"] = 6
+        atual["etapa"] = 5
         salvar(pasta, atual)
     progresso(100, f"{ok} de {len(fila)} postagem(ns) feitas" + ("" if ok == len(fila) else " (veja os erros em cada corte)"))
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("tarefa", choices=["entrada", "assuntos", "layouts", "broll", "previa", "exportar", "postar"])
+    ap.add_argument("tarefa", choices=["entrada", "assuntos", "layouts", "exportar", "postar"])
     ap.add_argument("--privado", action="store_true")
     ap.add_argument("--retranscrever", action="store_true")
     ap.add_argument("pasta")
@@ -539,10 +456,6 @@ if __name__ == "__main__":
         assuntos(pasta, a.modelo, a.modo, a.min, a.max)
     elif a.tarefa == "layouts":
         layouts(pasta, [i for i in a.ids.split(",") if i])
-    elif a.tarefa == "previa":
-        previa_broll(pasta, a.ids)
-    elif a.tarefa == "broll":
-        brolls(pasta, [i for i in a.ids.split(",") if i], a.modelo)
     elif a.tarefa == "postar":
         postar(pasta, [i for i in a.ids.split(",") if i], not a.privado)
     else:

@@ -280,7 +280,7 @@ NIVEIS_RESUMO = {
     "medio": "Tire também digressões, exemplos secundários e falas que repetem uma ideia já dita com outras palavras.",
     "forte": "Fique só com o essencial: a abertura, os pontos principais e a conclusão.",
 }
-PROMPT_RESUMO = """Você edita cortes rápidos para TikTok/Reels de um canal de notícias e debate.
+PROMPT_RESUMO = """Você edita cortes rápidos para TikTok/Reels de um canal de lives e vídeos longos (podcast, entrevista, debate, notícias, aula).
 Abaixo estão as frases de UM assunto da live, numeradas, com a duração de cada uma. O editor escolheu à mão onde
 esse assunto começa e termina: a primeira frase é a abertura e a última é o fechamento. Use isso como referência
 de começo e fim; você só pode escolher frases desta lista.
@@ -326,7 +326,7 @@ def resumir(nome: str, aid: str, modelo: str = Body("sonnet"), nivel: str = Body
     return a
 
 
-PROMPT_SUBCORTES = """Você edita cortes rápidos para TikTok/Reels de um canal de notícias e debate.
+PROMPT_SUBCORTES = """Você edita cortes rápidos para TikTok/Reels de um canal de lives e vídeos longos (podcast, entrevista, debate, notícias, aula).
 Abaixo está UM assunto da live que o editor já separou, com as frases numeradas e o tempo de cada uma.
 Encontre, DENTRO dele, cortes menores que funcionem sozinhos: um argumento, uma resposta, uma revelação, uma frase de impacto
 com o contexto mínimo para ser entendida. Quantos houver de bom (pode ser nenhum); não force.
@@ -368,7 +368,7 @@ def sugerir_subcortes(nome: str, aid: str, modelo: str = Body("sonnet", embed=Tr
 
 # ---------------------------------------------------------------- chat com o Claude (etapa 2)
 
-SISTEMA_CHAT = """Você é o assistente de edição do editor de cortes de um canal de notícias e debate ao vivo.
+SISTEMA_CHAT = """Você é o assistente de edição do editor de cortes de um canal de lives e vídeos longos (podcast, entrevista, debate, notícias, aula).
 O usuário transforma a live em cortes curtos (TikTok/Reels). Você conhece a transcrição inteira, com as frases numeradas,
 e a lista atual de assuntos (cortes). Ajude a lapidar os assuntos: dividir, juntar, ajustar início/fim, achar assuntos
 novos, renomear, resumir. Também pode só responder perguntas sobre a live.
@@ -637,14 +637,12 @@ def exportar(nome: str, ids: list = Body(...), formatos: list = Body(...)):
     return iniciar_tarefa("exportar", nome, [pasta_de(nome), "--ids", ",".join(ids), "--formatos", ",".join(formatos)])
 
 
-# ---------------------------------------------------------------- configurações (pasta/chave do b-roll, apps e contas)
+# ---------------------------------------------------------------- configurações (idioma, apps e contas)
 
 @app.get("/api/config")
 def ver_config():
-    import broll
     import config
-    cfg = config.carregar()
-    return dict(config.publico(cfg), broll_arquivos=len(broll.arquivos(cfg["broll_pasta"])))
+    return config.publico(config.carregar())
 
 
 @app.put("/api/config")
@@ -652,18 +650,6 @@ def salvar_config(mudancas: dict = Body(...)):
     import config
     config.atualizar(mudancas)
     return ver_config()
-
-
-@app.post("/api/config/escolher-pasta")
-def escolher_pasta():
-    """Janela do Windows para escolher a pasta de B-roll (app local). Processo separado: o tkinter quer a thread principal."""
-    r = subprocess.run([sys.executable, "-c", "import tkinter, tkinter.filedialog as f\nr = tkinter.Tk(); r.withdraw(); "
-                        "r.attributes('-topmost', 1)\nprint(f.askdirectory(title='Pasta de B-roll'))"],
-                       capture_output=True, text=True, encoding="utf-8", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-    pasta = r.stdout.strip()
-    if r.returncode != 0:
-        raise HTTPException(500, "Não consegui abrir a janela de pastas; cole o caminho no campo.")
-    return {"pasta": os.path.normpath(pasta) if pasta else ""}
 
 
 @app.get("/api/contas/conectar/{app_nome}")
@@ -702,60 +688,7 @@ def remover_conta(cid: str):
     return ver_config()
 
 
-# ---------------------------------------------------------------- b-roll (etapa 4)
-
-@app.post("/api/projetos/{nome}/broll")
-def gerar_broll(nome: str, ids: list = Body(...), modelo: str = Body("sonnet")):
-    if not ids:
-        raise HTTPException(400, "Nenhum assunto escolhido")
-    return iniciar_tarefa("broll", nome, [pasta_de(nome), "--ids", ",".join(ids), "--modelo", modelo])
-
-
-@app.post("/api/projetos/{nome}/assuntos/{aid}/broll/previa")
-def previa_broll(nome: str, aid: str):
-    return iniciar_tarefa("previa", nome, [pasta_de(nome), "--ids", aid])
-
-
-@app.put("/api/projetos/{nome}/assuntos/{aid}/broll")
-def salvar_broll(nome: str, aid: str, itens: list = Body(..., embed=True)):
-    pasta = pasta_de(nome)
-    proj, a = _assunto(pasta, aid)
-    if not a.get("layout"):
-        raise HTTPException(409, "Analise os layouts deste assunto primeiro")
-    a["broll"] = {"assinatura": (a.get("broll") or a["layout"])["assinatura"], "itens": itens}
-    tarefas.salvar(pasta, proj)
-    return {"ok": True}
-
-
-@app.post("/api/broll/buscar")
-def buscar_broll(busca: str = Body(..., embed=True)):
-    """Opções de mídia para uma busca: arquivos da sua pasta com as palavras no nome, depois o Pexels."""
-    import broll
-    import config
-    cfg = config.carregar()
-    palavras = [p for p in busca.lower().split() if len(p) > 2]
-    locais = [broll.opcao_local(n) for n in broll.arquivos(cfg["broll_pasta"]) if palavras and any(p in n.lower() for p in palavras)]
-    return locais[:6] + broll.opcoes(busca, cfg)
-
-
-@app.get("/api/broll/arquivos")
-def arquivos_broll():
-    import broll
-    import config
-    return broll.arquivos(config.carregar()["broll_pasta"])
-
-
-@app.get("/api/broll/arquivo/{caminho:path}")
-def arquivo_broll(caminho: str):
-    import broll
-    import config
-    alvo = broll.caminho_na_pasta(config.carregar()["broll_pasta"], caminho)
-    if not alvo:
-        raise HTTPException(404, "Arquivo não encontrado na pasta de B-roll")
-    return FileResponse(alvo)
-
-
-# ---------------------------------------------------------------- postagem (etapa 6)
+# ---------------------------------------------------------------- postagem (etapa 5)
 
 @app.post("/api/projetos/{nome}/postagem/sugerir")
 def sugerir_postagem(nome: str, ids: list = Body(...), modelo: str = Body("sonnet")):

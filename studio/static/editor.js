@@ -675,7 +675,7 @@ function montarEditor(raiz, frases) {
           h("label", { class: "fraco pequeno", title: "Desligado: o corte dura o que o assunto durar. Ligado: o Claude só propõe cortes nessa faixa (0 = sem esse lado); vale para a próxima busca, não mexe nos assuntos que já estão na lista" },
             limite.ligado, " limitar duração: de ", limite.min, " a ", limite.max, " s"),
           h("span", { style: "flex:1" }),
-          assuntos.length ? h("a", { href: `#/p/${enc(projeto.nome)}/5` }, h("button", { class: "primario" }, "Exportar →")) : null),
+          assuntos.length ? h("a", { href: `#/p/${enc(projeto.nome)}/4` }, h("button", { class: "primario" }, "Exportar →")) : null),
         caixaVersoes,
         resumoLista,
         lista)));

@@ -226,12 +226,7 @@ main:has(.layouts) { max-width: 1600px; }
 .trecho.escolhivel:hover { background: #ff5a3640; }
 .trecho.tipo-pessoa { background: #ffb34722; }
 
-/* configurações, b-roll e postagem */
+/* configurações e postagem */
 .config-link { margin-left: auto; margin-right: 12px; font-size: 13px; opacity: .8; text-decoration: none; color: inherit; }
-.broll-item { display: flex; gap: 14px; padding: 12px 0; border-top: 1px solid #ffffff14; }
-.broll-thumb { width: 108px; height: 192px; flex: none; object-fit: cover; border-radius: 6px; background: #000; }
-.broll-thumb.vazio { display: flex; align-items: center; justify-content: center; font-size: 12px; opacity: .6; }
-.broll-corpo { flex: 1; min-width: 0; }
-.broll-corpo p { margin: 6px 0; }
 .cartao > textarea { resize: vertical; margin: 8px 0; box-sizing: border-box; font: inherit; }
 .conta-post { display: inline-flex; align-items: center; gap: 4px; margin-right: 14px; }

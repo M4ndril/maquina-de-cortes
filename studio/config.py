@@ -1,5 +1,5 @@
 """
-Configurações locais do Studio (config_local.json, fora do git): pasta e chave do B-roll, apps de desenvolvedor
+Configurações locais do Studio (config_local.json, fora do git): idioma da transcrição, apps de desenvolvedor
 das plataformas e as contas conectadas para postagem. Tem segredos e tokens: a tela só recebe a versão de publico().
 """
 import json
@@ -16,9 +16,6 @@ def carregar():
     if os.path.exists(ARQUIVO):
         with open(ARQUIVO, encoding="utf-8") as f:
             cfg = json.load(f)
-    cfg.setdefault("broll_pasta", "")
-    cfg.setdefault("pexels_chave", "")
-    cfg.setdefault("pixabay_chave", "")
     cfg.setdefault("idioma", "pt")  # idioma falado nos vídeos; "auto" = o Whisper adivinha
     cfg.setdefault("contas", [])
     for app in APPS:
@@ -36,26 +33,17 @@ def publico(cfg):
     """O que a tela vê: nada de chave, segredo ou token (só se já foram preenchidos)."""
     return {
         "idioma": cfg["idioma"],
-        "broll_pasta": cfg["broll_pasta"],
-        "broll_pasta_ok": bool(cfg["broll_pasta"]) and os.path.isdir(cfg["broll_pasta"]),
-        "pexels": bool(cfg["pexels_chave"]),
-        "pixabay": bool(cfg["pixabay_chave"]),
         "apps": {k: {"id": v["id"], "segredo": bool(v["segredo"])} for k, v in cfg["apps"].items()},
         "contas": [{k: c.get(k, "") for k in ("id", "plataforma", "nome", "assuntos")} for c in cfg["contas"]],
     }
 
 
 def atualizar(mudancas):
-    """Mudanças vindas da tela: {"broll_pasta", "pexels_chave", "apps": {app: {"id", "segredo"}}, "contas": [{"id", "assuntos"}]}.
+    """Mudanças vindas da tela: {"idioma", "apps": {app: {"id", "segredo"}}, "contas": [{"id", "assuntos"}]}.
     Campo de segredo vazio = não mexe (a tela nunca recebe o valor para devolver)."""
     cfg = carregar()
-    if "broll_pasta" in mudancas:
-        cfg["broll_pasta"] = str(mudancas["broll_pasta"]).strip().strip('"')
     if mudancas.get("idioma") in IDIOMAS:
         cfg["idioma"] = mudancas["idioma"]
-    for banco in ("pexels", "pixabay"):
-        if mudancas.get(banco + "_chave"):
-            cfg[banco + "_chave"] = str(mudancas[banco + "_chave"]).strip()
     for app, v in (mudancas.get("apps") or {}).items():
         if app in APPS:
             cfg["apps"][app]["id"] = str(v.get("id", cfg["apps"][app]["id"])).strip()
